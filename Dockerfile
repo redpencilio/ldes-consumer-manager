@@ -1,4 +1,7 @@
 FROM semtech/mu-python-template:2.0.0-beta.1
-LABEL maintainer="Niels Vandekeybus <progster@gmail.com>"
+LABEL org.opencontainers.image.authors="info@redpencil.io"
 
-# see https://github.com/mu-semtech/mu-python-template for more info
+ENV DOCKER_HOST "unix://var/run/docker.sock"
+ENV CONSUMER_IMAGE "redpencil/ldes-consumer-service:feature=stop-on-errors"
+
+
