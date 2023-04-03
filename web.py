@@ -1,9 +1,11 @@
 # see https://github.com/mu-semtech/mu-python-template for more info
-from helpers import logger
+from helpers import logger, query
 import docker
-from config import MU_NETWORK,CONTAINER_LABEL,CONSUMER_IMAGE
+from config import (MU_NETWORK,CONTAINER_LABEL,CONSUMER_IMAGE,DEFAULT_DEREFERENCE_MEMBERS,
+                   DEFAULT_REQUESTS_PER_MINUTE,DEFAULT_REPLACE_VERSIONS)
 from utils import create_container, list_containers
 from flask import jsonify, request
+
 
 def docker_is_up():
   try:
@@ -34,37 +36,63 @@ def hello():
   except RuntimeError:
     return "Hello from the ldes-consumer manager, docker is not responding!"
 
-@app.route("/ldes-consumers", methods = ['GET', 'POST'])
+@app.route("/ldes-consumers", methods = ['GET'])
 def ldes_consumers():
-  if request.method == 'GET':
-    consumers = list_containers()
-    return jsonify(consumers)
-  elif request.method == 'POST':
-    content = request.json
-    data = content["data"]
-    attributes = data["attributes"]
-    feed_url = attributes["ldes-endpoint"]
-    dereference_members = attributes["dereference-members"]
-    requests_per_minute = attributes["requests-per-minute"]
-    replace_versions = attributes["replace-versions"]
-    id = create_container(
-      feed_url,
-      {
-        "LDES_DEREFERENCE_MEMBERS": dereference_members,
-        "LDES_REQUESTS_PER_MINUTE": requests_per_minute,
-        "REPLACE_VERSIONS": replace_versions
+  consumers = list_containers()
+  return jsonify(consumers)
+
+@app.route("/ldes-consumers", methods = ['POST'])
+def ldes_consumer_add():
+  content = request.json
+  data = content["data"]
+  attributes = data["attributes"]
+  feed_url = attributes["ldes-endpoint"]
+  dereference_members = attributes["dereference-members"]
+  requests_per_minute = attributes["requests-per-minute"]
+  replace_versions = attributes["replace-versions"]
+
+  return create_consumer_container(feed_url, dereference_members, requests_per_minute, replace_versions)
+
+@app.route("/delta", methods = ['POST'])
+def process_delta():
+  for content in request.json:
+    inserts = content['inserts']
+    subjects = set(map(lambda i:i['subject']['value'], inserts))
+
+    to_create = []
+
+    for subject in subjects:
+      _query = "SELECT ?feed ?type WHERE {<" + str(subject) + "> <http://purl.org/dc/terms/type> ?type ; <http://xmlns.com/foaf/0.1/page> ?feed . }"
+      results = query(_query)['results']['bindings']
+      for result in results:
+          if result['type']['value'] == "http://vocabsearch.data.gift/dataset-types/LDES":
+              to_create.append((subject, result['feed']['value']))
+
+    for entry in to_create:
+      create_consumer_container(entry[1])
+  return ('', 204)
+
+
+
+def create_consumer_container(feed_url, dereference_members=DEFAULT_DEREFERENCE_MEMBERS, requests_per_minute=DEFAULT_REQUESTS_PER_MINUTE, replace_versions=DEFAULT_REPLACE_VERSIONS):
+  id = create_container(
+    feed_url,
+    {
+      "LDES_DEREFERENCE_MEMBERS": dereference_members,
+      "LDES_REQUESTS_PER_MINUTE": requests_per_minute,
+      "REPLACE_VERSIONS": replace_versions
+    }
+  )
+  return jsonify(
+    {
+      "type": "ldes-consumers",
+      "id": id,
+      "data": {
+        "feed-url": feed_url,
+        "dereference-members": dereference_members,
+        "requests-per-minute": requests_per_minute,
+        "replace-versions": replace_versions
       }
-    )
-    return jsonify(
-      {
-        "type": "ldes-consumers",
-        "id": id,
-        "data": {
-          "feed-url": feed_url,
-          "dereference-members": dereference_members,
-          "requests-per-minute": requests_per_minute,
-          "replace-versions": replace_versions
-        }
-      }
-    )
+    }
+  )
 
