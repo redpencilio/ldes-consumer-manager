@@ -2,7 +2,7 @@
 from helpers import logger, query
 import docker
 from config import (MU_NETWORK,CONTAINER_LABEL,CONSUMER_IMAGE,DEFAULT_DEREFERENCE_MEMBERS,
-                   DEFAULT_REQUESTS_PER_MINUTE,DEFAULT_REPLACE_VERSIONS)
+                   DEFAULT_REQUESTS_PER_MINUTE,DEFAULT_REPLACE_VERSIONS, CRON_PATTERN)
 from utils import create_container, list_containers
 from flask import jsonify, request
 
@@ -74,10 +74,11 @@ def process_delta():
 
 
 
-def create_consumer_container(feed_url, dereference_members=DEFAULT_DEREFERENCE_MEMBERS, requests_per_minute=DEFAULT_REQUESTS_PER_MINUTE, replace_versions=DEFAULT_REPLACE_VERSIONS, dataset=None):
+def create_consumer_container(feed_url, dereference_members=DEFAULT_DEREFERENCE_MEMBERS, requests_per_minute=DEFAULT_REQUESTS_PER_MINUTE, replace_versions=DEFAULT_REPLACE_VERSIONS, dataset=None, cron_pattern=CRON_PATTERN):
   options = {
     "LDES_DEREFERENCE_MEMBERS": dereference_members,
     "LDES_REQUESTS_PER_MINUTE": requests_per_minute,
+    "CRON_PATTERN": CRON_PATTERN,
     "REPLACE_VERSIONS": replace_versions
   }
   if dataset is not None:
