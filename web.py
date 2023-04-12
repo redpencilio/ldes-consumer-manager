@@ -69,19 +69,22 @@ def process_delta():
               to_create.append((subject, result['feed']['value']))
 
     for entry in to_create:
-      create_consumer_container(entry[1])
+      create_consumer_container(entry[1], dataset=entry[0])
   return ('', 204)
 
 
 
-def create_consumer_container(feed_url, dereference_members=DEFAULT_DEREFERENCE_MEMBERS, requests_per_minute=DEFAULT_REQUESTS_PER_MINUTE, replace_versions=DEFAULT_REPLACE_VERSIONS):
+def create_consumer_container(feed_url, dereference_members=DEFAULT_DEREFERENCE_MEMBERS, requests_per_minute=DEFAULT_REQUESTS_PER_MINUTE, replace_versions=DEFAULT_REPLACE_VERSIONS, dataset=None):
+  options = {
+    "LDES_DEREFERENCE_MEMBERS": dereference_members,
+    "LDES_REQUESTS_PER_MINUTE": requests_per_minute,
+    "REPLACE_VERSIONS": replace_versions
+  }
+  if dataset is not None:
+      options["DATASET_URL"] = dataset
   id = create_container(
     feed_url,
-    {
-      "LDES_DEREFERENCE_MEMBERS": dereference_members,
-      "LDES_REQUESTS_PER_MINUTE": requests_per_minute,
-      "REPLACE_VERSIONS": replace_versions
-    }
+    options
   )
   return jsonify(
     {
