@@ -87,6 +87,10 @@ def create_consumer_container(feed_url, dereference_members=DEFAULT_DEREFERENCE_
     feed_url,
     options
   )
+  if dataset is not None:
+      graph = id["attributes"]["graph"]
+      _query = "INSERT DATA { GRAPH <http://mu.semte.ch/graphs/public> { <" + dataset + "> <http://mu.semte.ch/vocabularies/ext/datasetGraph> <" + graph + "> } }"
+      query(_query)
   return jsonify(
     {
       "type": "ldes-consumers",
