@@ -62,14 +62,14 @@ def process_delta():
     to_create = []
 
     for subject in subjects:
-      _query = "SELECT ?feed ?type WHERE {<" + str(subject) + "> <http://purl.org/dc/terms/type> ?type ; <http://xmlns.com/foaf/0.1/page> ?feed . }"
+      _query = "SELECT ?feed ?type ?maxRequests WHERE {<" + str(subject) + "> <http://purl.org/dc/terms/type> ?type ; <http://xmlns.com/foaf/0.1/page> ?feed ; 	<http://mu.semte.ch/vocabularies/ext/maxRequests> ?maxRequests . }"
       results = query(_query)['results']['bindings']
       for result in results:
           if result['type']['value'] == "http://vocabsearch.data.gift/dataset-types/LDES":
-              to_create.append((subject, result['feed']['value']))
+              to_create.append((subject, result['feed']['value'], result['maxRequests']['value']))
 
     for entry in to_create:
-      create_consumer_container(entry[1], dataset=entry[0])
+      create_consumer_container(entry[1], dataset=entry[0], requests_per_minute=entry[2])
   return ('', 204)
 
 
