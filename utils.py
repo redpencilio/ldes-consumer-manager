@@ -33,7 +33,8 @@ def container_to_json_view(container):
             "dereference-members": container_env["LDES_DEREFERENCE_MEMBERS"],
             "requests-per-minute": container_env["LDES_REQUESTS_PER_MINUTE"],
             "replace-versions": container_env["REPLACE_VERSIONS"],
-            "graph": container_env["MU_APPLICATION_GRAPH"]
+            "graph": container_env["MU_APPLICATION_GRAPH"],
+            "dataset": container_env["DATASET_URL"]
         }
     }
     return view

@@ -1,6 +1,8 @@
 # see https://github.com/mu-semtech/mu-python-template for more info
-from helpers import logger, query
+from helpers import logger, query, update
+from escape_helpers import sparql_escape_datetime
 import docker
+import datetime
 from config import (MU_NETWORK,CONTAINER_LABEL,CONSUMER_IMAGE,DEFAULT_DEREFERENCE_MEMBERS,
                    DEFAULT_REQUESTS_PER_MINUTE,DEFAULT_REPLACE_VERSIONS, CRON_PATTERN)
 from utils import create_container, list_containers
@@ -57,16 +59,17 @@ def ldes_consumer_add():
 def process_delta():
   for content in request.json:
     inserts = content['inserts']
+    inserts = list(filter(lambda i:i['predicate']['value'] == 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', inserts))
+    inserts = list(filter(lambda i:i['object']['value'] == 'http://rdfs.org/ns/void#Dataset', inserts))
     subjects = set(map(lambda i:i['subject']['value'], inserts))
 
     to_create = []
 
     for subject in subjects:
-      _query = "SELECT ?feed ?type ?maxRequests WHERE {<" + str(subject) + "> <http://purl.org/dc/terms/type> ?type ; <http://xmlns.com/foaf/0.1/page> ?feed ; 	<http://mu.semte.ch/vocabularies/ext/maxRequests> ?maxRequests . }"
+      _query = "SELECT * WHERE {<" + str(subject) + "> <http://purl.org/dc/terms/type> <http://vocabsearch.data.gift/dataset-types/LDES> ; <http://xmlns.com/foaf/0.1/page> ?feed ; <http://mu.semte.ch/vocabularies/ext/maxRequests> ?maxRequests . }"
       results = query(_query)['results']['bindings']
       for result in results:
-          if result['type']['value'] == "http://vocabsearch.data.gift/dataset-types/LDES":
-              to_create.append((subject, result['feed']['value'], result['maxRequests']['value']))
+        to_create.append((subject, result['feed']['value'], result['maxRequests']['value']))
 
     for entry in to_create:
       create_consumer_container(entry[1], dataset=entry[0], requests_per_minute=entry[2])
@@ -81,26 +84,44 @@ def create_consumer_container(feed_url, dereference_members=DEFAULT_DEREFERENCE_
     "CRON_PATTERN": CRON_PATTERN,
     "REPLACE_VERSIONS": replace_versions
   }
+  existing_containers = []
   if dataset is not None:
-      options["DATASET_URL"] = dataset
-  id = create_container(
-    feed_url,
-    options
-  )
-  if dataset is not None:
-      graph = id["attributes"]["graph"]
-      _query = "INSERT DATA { GRAPH <http://mu.semte.ch/graphs/public> { <" + dataset + "> <http://mu.semte.ch/vocabularies/ext/datasetGraph> <" + graph + "> } }"
-      query(_query)
-  return jsonify(
-    {
-      "type": "ldes-consumers",
-      "id": id,
-      "data": {
-        "feed-url": feed_url,
-        "dereference-members": dereference_members,
-        "requests-per-minute": requests_per_minute,
-        "replace-versions": replace_versions
-      }
-    }
-  )
+    options["DATASET_URL"] = dataset
+    existing_containers = list(filter(lambda i:i['attributes']['dataset'] == dataset, list_containers()['data']))
 
+  if not existing_containers:
+    id = create_container(
+      feed_url,
+      options
+    )
+    if dataset is not None:
+        graph = id["attributes"]["graph"]
+        _query = "INSERT DATA { GRAPH <http://mu.semte.ch/graphs/public> { <" + dataset + "> <http://mu.semte.ch/vocabularies/ext/datasetGraph> <" + graph + ">. } }"
+        update(_query)
+    return jsonify(
+      {
+        "type": "ldes-consumers",
+        "id": id,
+        "data": {
+          "feed-url": feed_url,
+          "dereference-members": dereference_members,
+          "requests-per-minute": requests_per_minute,
+          "replace-versions": replace_versions
+        }
+      }
+    )
+  else:
+    container = existing_containers[0]
+    attributes = container['attributes']
+    return jsonify(
+      {
+        "type": "ldes-consumers",
+        "id": container['id'],
+        "data": {
+          "feed-url": attributes['feed-url'],
+          "dereference-members": attributes['dereference-members'],
+          "requests-per-minute": attributes['requests-per-minute'],
+          "replace-versions": attributes['replace-versions']
+        }
+      }
+    )
