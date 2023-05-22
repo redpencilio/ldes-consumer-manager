@@ -1,6 +1,5 @@
 import os
-CONSUMER_IMAGE = os.getenv("CONSUMER_IMAGE")
-# CONSUMER_IMAGE = "redpencil/ldes-consumer:feature-stop-on-errors"
+CONSUMER_IMAGE = os.getenv("CONSUMER_IMAGE") or "redpencil/ldes-consumer:feature-better-processing"
 MU_NETWORK = os.getenv("MU_NETWORK")
 CONTAINER_LABEL="io.redpencil.ldes-consumer-manager"
 CRON_PATTERN=os.getenv("CRON_PATTERN", "* 0 * * * *")
