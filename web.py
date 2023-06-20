@@ -5,7 +5,8 @@ import docker
 import datetime
 from string import Template
 from config import (MU_NETWORK,CONTAINER_LABEL,CONSUMER_IMAGE,DEFAULT_DEREFERENCE_MEMBERS,
-                   DEFAULT_REQUESTS_PER_MINUTE,DEFAULT_REPLACE_VERSIONS, CRON_PATTERN)
+                   DEFAULT_REQUESTS_PER_MINUTE,DEFAULT_REPLACE_VERSIONS, CRON_PATTERN,
+                   REMOVE_CONTAINERS_ON_DELETE)
 from utils import create_container, list_containers
 from flask import jsonify, request
 
@@ -77,11 +78,26 @@ SELECT * WHERE {
             for result in results:
                 to_create.append((subject, result['feed']['value'], result['maxRequests']['value']))
 
-        for entry in to_create:
-            create_consumer_container(entry[1], dataset=entry[0], requests_per_minute=entry[2])
+    for entry in to_create:
+      create_consumer_container(entry[1], dataset=entry[0], requests_per_minute=entry[2])
+
+
+    deletes = content['deletes']
+    deletes = list(filter(lambda i:i['predicate']['value'] == 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', deletes))
+    deletes = list(filter(lambda i:i['object']['value'] == 'http://rdfs.org/ns/void#Dataset', deletes))
+    subjects = set(map(lambda i:i['subject']['value'], deletes))
+
+    to_delete = []
+
+    for subject in subjects:
+      _query = "SELECT * WHERE {<" + str(subject) + "> <http://mu.semte.ch/vocabularies/ext/datasetGraph> ?graph . }"
+      results = query(_query)['results']['bindings']
+      for result in results:
+        to_delete.append(result['graph']['value'])
+
+    for entry in to_delete:
+      remove_consumer_container(entry)
     return ('', 204)
-
-
 
 def create_consumer_container(feed_url, dereference_members=DEFAULT_DEREFERENCE_MEMBERS, requests_per_minute=DEFAULT_REQUESTS_PER_MINUTE, replace_versions=DEFAULT_REPLACE_VERSIONS, dataset=None, cron_pattern=CRON_PATTERN):
     options = {
@@ -136,3 +152,13 @@ INSERT DATA {
                 "replace-versions": attributes['replace-versions']
             }
         })
+
+def remove_consumer_container(graph):
+    print("Deleting container to graph: ", graph)
+    containers = list(filter(lambda i:i['attributes']['graph'] == graph, list_containers()['data']))
+    if len(containers):
+        container = client.containers.list(filters = { "id": [containers[0]['id']]})
+        if len(container):
+            container[0].kill()
+            if REMOVE_CONTAINERS_ON_DELETE:
+                container[0].remove()

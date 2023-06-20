@@ -64,3 +64,4 @@ This service can be configured to create consumers when LDES datasets get create
 - `DEFAULT_REQUESTS_PER_MINUTE`: number of requests per minute (default: `150`)
 - `DEFAULT_REPLACE_VERSIONS`: whether to replace the versions  (default: `True`)
 - `MU_NETWORK`: the network in which the created consumers should reside
+- `REMOVE_CONTAINERS_ON_DELETE`: whether to remove (besides stopping) the associated container when a dataset is deleted (default: `False`)
