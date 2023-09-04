@@ -4,11 +4,11 @@ This service provides an interface to manage [ldes-consumer-service](https://git
 ## Usage
 
 Add to docker-compose:
-```
+```yml
 services:
   ldes-consumer-manager:
     image: redpencil/ldes-consumer-manager
-    volumes: 
+    volumes:
       - /var/run/docker.sock:/var/run/docker.sock
 ```
 
@@ -19,20 +19,20 @@ services:
 {
   "type": "ldes-consumers",
   "data": {
-  "attributes": {
-    "ldes-endpoint": "https://marineregions.org/feed",
-    "dereference-members": true,
-    "requests-per-minute": 150,
-    "replace-versions": true
+    "attributes": {
+      "ldes-endpoint": "https://marineregions.org/feed",
+      "dereference-members": true,
+      "requests-per-minute": 150,
+      "replace-versions": true
+    }
   }
-}
 }
 ```
 
 ## Delta
 
 This service can be configured to create consumers when LDES datasets get created, using the following delta configuration.
-```
+```js
   {
     match: {
       predicate: {
