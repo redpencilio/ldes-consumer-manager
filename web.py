@@ -1,8 +1,9 @@
 # see https://github.com/mu-semtech/mu-python-template for more info
 from helpers import logger, query, update
-from escape_helpers import sparql_escape_datetime
+from escape_helpers import sparql_escape_uri
 import docker
 import datetime
+from string import Template
 from config import (MU_NETWORK,CONTAINER_LABEL,CONSUMER_IMAGE,DEFAULT_DEREFERENCE_MEMBERS,
                    DEFAULT_REQUESTS_PER_MINUTE,DEFAULT_REPLACE_VERSIONS, CRON_PATTERN)
 from utils import create_container, list_containers
@@ -66,7 +67,12 @@ def process_delta():
         to_create = []
 
         for subject in subjects:
-            _query = "SELECT * WHERE {<" + str(subject) + "> <http://purl.org/dc/terms/type> <http://vocabsearch.data.gift/dataset-types/LDES> ; <http://xmlns.com/foaf/0.1/page> ?feed ; <http://mu.semte.ch/vocabularies/ext/maxRequests> ?maxRequests . }"
+            _query = Template("""
+SELECT * WHERE {
+    $subject <http://purl.org/dc/terms/type> <http://vocabsearch.data.gift/dataset-types/LDES> ;
+        <http://xmlns.com/foaf/0.1/page> ?feed ;
+        <http://mu.semte.ch/vocabularies/ext/maxRequests> ?maxRequests .
+}""").substitute(subject=sparql_escape_uri(subject))
             results = query(_query)['results']['bindings']
             for result in results:
                 to_create.append((subject, result['feed']['value'], result['maxRequests']['value']))
@@ -96,7 +102,16 @@ def create_consumer_container(feed_url, dereference_members=DEFAULT_DEREFERENCE_
         )
         if dataset is not None:
             graph = id["attributes"]["graph"]
-            _query = "INSERT DATA { GRAPH <http://mu.semte.ch/graphs/public> { <" + dataset + "> <http://mu.semte.ch/vocabularies/ext/datasetGraph> <" + graph + ">. } }"
+            _query_template = Template("""
+INSERT DATA {
+    GRAPH <http://mu.semte.ch/graphs/public> {
+        $dataset <http://mu.semte.ch/vocabularies/ext/datasetGraph> $graph .
+    }
+}""")
+            _query = _query_template.substitute(
+                dataset=sparql_escape_uri(dataset),
+                graph=sparql_escape_uri(graph)
+            )
             update(_query)
         return jsonify({
             "type": "ldes-consumers",
