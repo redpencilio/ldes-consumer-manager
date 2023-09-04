@@ -79,6 +79,14 @@ SELECT * WHERE {
 
         for entry in to_create:
             create_consumer_container(entry[1], dataset=entry[0], requests_per_minute=entry[2])
+
+        deletes = content['deletes']
+        deletes = list(filter(lambda i:i['predicate']['value'] == 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', deletes))
+        deletes = list(filter(lambda i:i['object']['value'] == 'http://rdfs.org/ns/void#Dataset', deletes))
+        to_delete = set(map(lambda i:i['subject']['value'], deletes))
+
+        for entry in to_delete:
+            remove_consumer_container(dataset=entry)
     return ('', 204)
 
 
@@ -136,3 +144,15 @@ INSERT DATA {
                 "replace-versions": attributes['replace-versions']
             }
         })
+
+def remove_consumer_container(dataset=None):
+    existing_containers = []
+    if dataset is not None:
+        existing_containers = list(filter(lambda i:i['attributes']['dataset'] == dataset, list_containers()['data']))
+
+    if not existing_containers:
+        pass
+    else:
+        for container in existing_containers:
+            container.stop()
+            container.remove()
