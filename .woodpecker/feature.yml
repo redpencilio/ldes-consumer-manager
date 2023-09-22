@@ -1,0 +1,11 @@
+steps:
+  build-feature:
+    image: woodpeckerci/plugin-docker-buildx
+    platforms: linux/amd64
+    settings:
+      repo: ${CI_REPO/redpencilio/redpencil}
+      tags: ${CI_COMMIT_BRANCH/\//-}
+    secrets: [ docker_username, docker_password ]
+when:
+  branch: feature/*
+  event: push
