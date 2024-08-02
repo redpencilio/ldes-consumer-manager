@@ -64,6 +64,7 @@ def process_delta():
         inserts = list(filter(lambda i:i['predicate']['value'] == 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', inserts))
         inserts = list(filter(lambda i:i['object']['value'] == 'http://rdfs.org/ns/void#Dataset', inserts))
         subjects = set(map(lambda i:i['subject']['value'], inserts))
+        logger.info(f"Received {len(subjects)} new dataset (type) inserts through delta.")
 
         to_create = []
 
@@ -75,6 +76,7 @@ SELECT * WHERE {
         <http://mu.semte.ch/vocabularies/ext/maxRequests> ?maxRequests .
 }""").substitute(subject=sparql_escape_uri(subject))
             results = query(_query)['results']['bindings']
+            logger.info(f"{len(results)} / {len(subjects)} received datasets are ldes-datasets.")
             for result in results:
                 to_create.append((subject, result['feed']['value'], result['maxRequests']['value']))
 
@@ -109,9 +111,11 @@ def create_consumer_container(feed_url, dereference_members=DEFAULT_DEREFERENCE_
     existing_containers = []
     if dataset is not None:
         options["DATASET_URL"] = dataset
+        logger.info(f"Looking for existing ldes consumer containers for dataset {dataset} ...")
         existing_containers = list(filter(lambda i:i['attributes']['dataset'] == dataset, list_containers()['data']))
 
     if not existing_containers:
+        logger.info(f"No ldes consumer container for dataset {dataset} yet. Creating one ...")
         id = create_container(
             feed_url,
             options
@@ -140,6 +144,7 @@ INSERT DATA {
             }
         })
     else:
+        logger.info(f"Already {len(existing_containers)} ldes consumer containers existing for dataset {dataset}. Returning the first one ...")
         container = existing_containers[0]
         attributes = container['attributes']
         return jsonify({
