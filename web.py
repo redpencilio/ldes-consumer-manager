@@ -6,7 +6,7 @@ import datetime
 from string import Template
 from config import (MU_NETWORK,CONTAINER_LABEL,CONSUMER_IMAGE,DEFAULT_DEREFERENCE_MEMBERS,
                    DEFAULT_REQUESTS_PER_MINUTE,DEFAULT_REPLACE_VERSIONS, CRON_PATTERN,
-                   REMOVE_CONTAINERS_ON_DELETE)
+                    REMOVE_CONTAINERS_ON_DELETE, DATASET_GRAPH)
 from utils import create_container, list_containers
 from flask import jsonify, request
 
@@ -85,46 +85,56 @@ def merge_deltas(delta_payload):
 
 @app.route("/delta", methods = ['POST'])
 def process_delta():
-    for content in request.json:
-        inserts = content['inserts']
-        inserts = list(filter(lambda i:i['predicate']['value'] == 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', inserts))
-        inserts = list(filter(lambda i:i['object']['value'] == 'http://rdfs.org/ns/void#Dataset', inserts))
-        subjects = set(map(lambda i:i['subject']['value'], inserts))
-        logger.info(f"Received {len(subjects)} new dataset (type) inserts through delta.")
+    merged_deltas = merge_deltas(request.json)
 
-        to_create = []
+    inserts = merged_deltas['inserts']
+    inserts = list(filter(lambda i:i['predicate']['value'] == 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', inserts))
+    inserts = list(filter(lambda i:i['object']['value'] == 'http://rdfs.org/ns/void#Dataset', inserts))
+    inserts = list(filter(lambda i:i['graph']['value'] == DATASET_GRAPH, inserts))
+    subjects = set(map(lambda i:i['subject']['value'], inserts))
+    logger.info(f"Received {len(subjects)} new dataset (type) inserts through delta.")
 
-        for subject in subjects:
-            _query = Template("""
+    for subject in subjects:
+        _query = Template("""
 SELECT * WHERE {
     $subject <http://purl.org/dc/terms/type> <http://vocabsearch.data.gift/dataset-types/LDES> ;
         <http://xmlns.com/foaf/0.1/page> ?feed ;
         <http://mu.semte.ch/vocabularies/ext/maxRequests> ?maxRequests .
+    OPTIONAL { $subject <http://mu.semte.ch/vocabularies/ext/dereferenceMembers> ?dereferenceMembers }
 }""").substitute(subject=sparql_escape_uri(subject))
-            results = query(_query)['results']['bindings']
-            logger.info(f"{len(results)} / {len(subjects)} received datasets are ldes-datasets.")
-            for result in results:
-                to_create.append((subject, result['feed']['value'], result['maxRequests']['value']))
+        results = query(_query)['results']['bindings']
+        if results:
+            result = results[0]
+            logger.info(f"Dataset {subject} is an LDES dataset. Processing ...")
+            dereference_members = result['dereferenceMembers']['value'] == "true" if result['dereferenceMembers']['value'] else None
+            create_consumer_container(result['feed']['value'],
+                                      requests_per_minute=result['maxRequests']['value'],
+                                      dereference_members=dereference_members,
+                                      dataset=subject)
+        else:
+            logger.info(f"Dataset {subject} isn't an LDES dataset. Ignoring ...")
 
-    for entry in to_create:
-      create_consumer_container(entry[1], dataset=entry[0], requests_per_minute=entry[2])
 
-
-    deletes = content['deletes']
+    deletes = merged_deltas['deletes']
     deletes = list(filter(lambda i:i['predicate']['value'] == 'http://www.w3.org/1999/02/22-rdf-syntax-ns#type', deletes))
     deletes = list(filter(lambda i:i['object']['value'] == 'http://rdfs.org/ns/void#Dataset', deletes))
+    deletes = list(filter(lambda i:i['graph']['value'] == DATASET_GRAPH, deletes))
     subjects = set(map(lambda i:i['subject']['value'], deletes))
 
     to_delete = []
 
+    logger.info(f"Received {len(subjects)} new dataset (type) deletes through delta.")
     for subject in subjects:
-      _query = "SELECT * WHERE {<" + str(subject) + "> <http://mu.semte.ch/vocabularies/ext/datasetGraph> ?graph . }"
-      results = query(_query)['results']['bindings']
-      for result in results:
-        to_delete.append(result['graph']['value'])
+        _query = "SELECT * WHERE {<" + str(subject) + "> <http://mu.semte.ch/vocabularies/ext/datasetGraph> ?graph . }"
+        results = query(_query)['results']['bindings']
+        if results:
+            result = results[0]
+            logger.info(f"Dataset {subject} needs to have its ldes-consumer-container removed ...")
+            logger.debug(result)
+            remove_consumer_container(result['graph']['value'])
+        else:
+            logger.info(f"Dataset {subject} isn't an LDES dataset. Ignoring ...")
 
-    for entry in to_delete:
-      remove_consumer_container(entry)
     return ('', 204)
 
 def create_consumer_container(feed_url, dereference_members=DEFAULT_DEREFERENCE_MEMBERS, requests_per_minute=DEFAULT_REQUESTS_PER_MINUTE, replace_versions=DEFAULT_REPLACE_VERSIONS, dataset=None, cron_pattern=CRON_PATTERN):
@@ -138,7 +148,10 @@ def create_consumer_container(feed_url, dereference_members=DEFAULT_DEREFERENCE_
     if dataset is not None:
         options["DATASET_URL"] = dataset
         logger.info(f"Looking for existing ldes consumer containers for dataset {dataset} ...")
-        existing_containers = list(filter(lambda i:i['attributes']['dataset'] == dataset, list_containers()['data']))
+        logger.debug(list_containers())
+        existing_containers = list(filter(
+            lambda i: i['attributes']['dataset'] == dataset,
+            list_containers()['data']))
 
     if not existing_containers:
         logger.info(f"No ldes consumer container for dataset {dataset} yet. Creating one ...")
