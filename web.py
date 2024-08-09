@@ -57,6 +57,32 @@ def ldes_consumer_add():
 
     return create_consumer_container(feed_url, dereference_members, requests_per_minute, replace_versions)
 
+def merge_deltas(delta_payload):
+    """
+    [
+        {
+            "inserts": [ ... ], "deletes": [ ... ]
+        },
+        {
+            "inserts": [ ... ], "deletes": [ ... ]
+        },
+        ...
+    ]
+        to
+    {
+        "inserts": [ ... ], "deletes": [ ... ]
+    }
+    """
+    inserts = []
+    deletes = []
+    for delta in delta_payload:
+        inserts = inserts + delta["inserts"]
+        deletes = deletes + delta["deletes"]
+    return {
+        "inserts": inserts,
+        "deletes": deletes
+    }
+
 @app.route("/delta", methods = ['POST'])
 def process_delta():
     for content in request.json:
