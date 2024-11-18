@@ -32,7 +32,6 @@ def create_container(endpoint, options):
 
 def container_to_json_view(container):
     container_env = dict(x.split("=") for x in container.attrs["Config"]["Env"])
-    logger.info(container_env)
     view = {
         "id": container.attrs["Id"],
         "type": "ldes-consumer",
