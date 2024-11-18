@@ -1,6 +1,7 @@
 from helpers import generate_uuid, logger
-from config import CONSUMER_IMAGE, MU_NETWORK, CONTAINER_LABEL
+from config import CONSUMER_IMAGE, MU_NETWORK, CONTAINER_LABEL, COMPOSE_PROJECT
 import docker
+
 def create_container(endpoint, options):
   environment_options = options if options else {}
   client = docker.from_env()
@@ -9,6 +10,14 @@ def create_container(endpoint, options):
   environment_options["MU_APPLICATION_GRAPH"] = f"http://datasets.vocabsearch.local/{dataset_uuid}"
   environment_options["LDES_STREAM"] = f"http://datasets.vocabsearch.local/{dataset_uuid}"
   environment_options["SPARQL_BATCH_SIZE"]  = "150"
+  container_labels = [CONTAINER_LABEL]
+
+  # Make consumers show up in same overview for docker-compose ps
+  if COMPOSE_PROJECT:
+    container_labels = {
+      CONTAINER_LABEL: None,
+      "com.docker.compose.project": COMPOSE_PROJECT
+    }
 
   container = client.containers.run(
       CONSUMER_IMAGE,
@@ -16,7 +25,7 @@ def create_container(endpoint, options):
       environment=environment_options,
       network=MU_NETWORK,
       restart_policy = {"Name": "always" },
-      labels= [CONTAINER_LABEL]
+      labels=container_labels
   )
   return container_to_json_view(container)
 
