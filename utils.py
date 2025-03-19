@@ -38,7 +38,6 @@ def container_to_json_view(container):
         "attributes": {
             "status": container.attrs["State"]["Status"],
             "feed-url": container_env["LDES_ENDPOINT_VIEW"],
-            "dereference-members": container_env["LDES_DEREFERENCE_MEMBERS"],
             "requests-per-minute": container_env["LDES_REQUESTS_PER_MINUTE"],
             "replace-versions": container_env["REPLACE_VERSIONS"],
             "graph": container_env["MU_APPLICATION_GRAPH"],
