@@ -9,7 +9,9 @@ def create_container(endpoint, options):
   dataset_uuid = generate_uuid()
   environment_options["MU_APPLICATION_GRAPH"] = f"http://datasets.vocabsearch.local/{dataset_uuid}"
   environment_options["LDES_STREAM"] = f"http://datasets.vocabsearch.local/{dataset_uuid}"
-  environment_options["SPARQL_BATCH_SIZE"]  = "150"
+  environment_options["LOG_LEVEL"] = "debug"
+  environment_options["INGEST_MODE"] = "MATERIALIZE"
+  environment_options["SPARQL_BATCH_SIZE"] = "150"
   container_labels = [CONTAINER_LABEL]
 
   # Make consumers show up in same overview for docker-compose ps
