@@ -135,9 +135,10 @@ SELECT * WHERE {
 
 def create_consumer_container(feed_url, requests_per_minute=DEFAULT_REQUESTS_PER_MINUTE, replace_versions=DEFAULT_REPLACE_VERSIONS, dataset=None, cron_pattern=CRON_PATTERN):
     options = {
-    "LDES_REQUESTS_PER_MINUTE": requests_per_minute,
-    "CRON_PATTERN": CRON_PATTERN,
-    "REPLACE_VERSIONS": replace_versions
+        "LDES_REQUESTS_PER_MINUTE": requests_per_minute,
+        "CRON_PATTERN": CRON_PATTERN,
+        "REPLACE_VERSIONS": replace_versions,
+        "SUDO_QUERY_RETRY": "true"
     }
     existing_containers = []
     if dataset is not None:
