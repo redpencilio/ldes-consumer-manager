@@ -106,7 +106,7 @@ SELECT * WHERE {
             result = results[0]
             logger.info(f"Dataset {subject} is an LDES dataset. Processing ...")
             create_consumer_container(result['feed']['value'],
-                                      result['datasetGraph']['value'],
+                                      result['datasetGraph']['value'] if 'datasetGraph' in result else None,
                                       requests_per_minute=result['maxRequests']['value'],
                                       dataset=subject)
         else:
