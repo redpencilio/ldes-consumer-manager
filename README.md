@@ -21,7 +21,6 @@ services:
   "data": {
     "attributes": {
       "ldes-endpoint": "https://marineregions.org/feed",
-      "dereference-members": true,
       "requests-per-minute": 150,
       "replace-versions": true
     }
@@ -60,7 +59,6 @@ This service can be configured to create consumers when LDES datasets get create
 
 - `CRON_PATTERN` [string]: the cron pattern which the cronjob should use. (default: `* 0 * * * *`)
 - `CONSUMER_IMAGE`: the image that should be used when creating consumers
-- `DEFAULT_DEREFERENCE_MEMBERS`: whether to derefence the members (default: `True`)
 - `DEFAULT_REQUESTS_PER_MINUTE`: number of requests per minute (default: `150`)
 - `DEFAULT_REPLACE_VERSIONS`: whether to replace the versions  (default: `True`)
 - `MU_NETWORK`: the network in which the created consumers should reside
