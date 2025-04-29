@@ -4,8 +4,8 @@ from escape_helpers import sparql_escape_uri
 import docker
 import datetime
 from string import Template
-from config import (MU_NETWORK,CONTAINER_LABEL,CONSUMER_IMAGE,DEFAULT_DEREFERENCE_MEMBERS,
-                   DEFAULT_REQUESTS_PER_MINUTE,DEFAULT_REPLACE_VERSIONS, CRON_PATTERN,
+from config import (MU_NETWORK,CONTAINER_LABEL, CONSUMER_IMAGE,
+                   DEFAULT_REQUESTS_PER_MINUTE, DEFAULT_REPLACE_VERSIONS, CRON_PATTERN,
                     REMOVE_CONTAINERS_ON_DELETE, DATASET_GRAPH)
 from utils import create_container, list_containers
 from flask import jsonify, request
@@ -51,11 +51,10 @@ def ldes_consumer_add():
     data = content["data"]
     attributes = data["attributes"]
     feed_url = attributes["ldes-endpoint"]
-    dereference_members = attributes["dereference-members"]
     requests_per_minute = attributes["requests-per-minute"]
     replace_versions = attributes["replace-versions"]
 
-    return create_consumer_container(feed_url, dereference_members, requests_per_minute, replace_versions)
+    return create_consumer_container(feed_url, None, requests_per_minute, replace_versions)
 
 def merge_deltas(delta_payload):
     """
@@ -100,16 +99,15 @@ SELECT * WHERE {
     $subject <http://purl.org/dc/terms/type> <http://vocabsearch.data.gift/dataset-types/LDES> ;
         <http://xmlns.com/foaf/0.1/page> ?feed ;
         <http://mu.semte.ch/vocabularies/ext/maxRequests> ?maxRequests .
-    OPTIONAL { $subject <http://mu.semte.ch/vocabularies/ext/dereferenceMembers> ?dereferenceMembers }
+    OPTIONAL { $subject <http://mu.semte.ch/vocabularies/ext/datasetGraph> ?datasetGraph . }
 }""").substitute(subject=sparql_escape_uri(subject))
         results = query(_query)['results']['bindings']
         if results:
             result = results[0]
             logger.info(f"Dataset {subject} is an LDES dataset. Processing ...")
-            dereference_members = result['dereferenceMembers']['value'] == "true" if result['dereferenceMembers']['value'] else None
             create_consumer_container(result['feed']['value'],
+                                      result['datasetGraph']['value'] if 'datasetGraph' in result else None,
                                       requests_per_minute=result['maxRequests']['value'],
-                                      dereference_members=dereference_members,
                                       dataset=subject)
         else:
             logger.info(f"Dataset {subject} isn't an LDES dataset. Ignoring ...")
@@ -137,12 +135,12 @@ SELECT * WHERE {
 
     return ('', 204)
 
-def create_consumer_container(feed_url, dereference_members=DEFAULT_DEREFERENCE_MEMBERS, requests_per_minute=DEFAULT_REQUESTS_PER_MINUTE, replace_versions=DEFAULT_REPLACE_VERSIONS, dataset=None, cron_pattern=CRON_PATTERN):
+def create_consumer_container(feed_url, dataset_graph=None, requests_per_minute=DEFAULT_REQUESTS_PER_MINUTE, replace_versions=DEFAULT_REPLACE_VERSIONS, dataset=None, cron_pattern=CRON_PATTERN):
     options = {
-    "LDES_DEREFERENCE_MEMBERS": dereference_members,
-    "LDES_REQUESTS_PER_MINUTE": requests_per_minute,
-    "CRON_PATTERN": CRON_PATTERN,
-    "REPLACE_VERSIONS": replace_versions
+        "LDES_REQUESTS_PER_MINUTE": requests_per_minute,
+        "CRON_PATTERN": CRON_PATTERN,
+        "REPLACE_VERSIONS": replace_versions,
+        "SUDO_QUERY_RETRY": "true"
     }
     existing_containers = []
     if dataset is not None:
@@ -155,11 +153,14 @@ def create_consumer_container(feed_url, dereference_members=DEFAULT_DEREFERENCE_
 
     if not existing_containers:
         logger.info(f"No ldes consumer container for dataset {dataset} yet. Creating one ...")
+        if dataset_graph:
+            logger.info(f"Dataset metadata already specifies {dataset_graph} as LDES target graph. Using that.")
         id = create_container(
             feed_url,
+            dataset_graph,
             options
         )
-        if dataset is not None:
+        if (dataset is not None) and (not dataset_graph):
             graph = id["attributes"]["graph"]
             _query_template = Template("""
 INSERT DATA {
@@ -177,7 +178,6 @@ INSERT DATA {
             "id": id,
             "data": {
                 "feed-url": feed_url,
-                "dereference-members": dereference_members,
                 "requests-per-minute": requests_per_minute,
                 "replace-versions": replace_versions
             }
@@ -191,7 +191,6 @@ INSERT DATA {
             "id": container['id'],
             "data": {
                 "feed-url": attributes['feed-url'],
-                "dereference-members": attributes['dereference-members'],
                 "requests-per-minute": attributes['requests-per-minute'],
                 "replace-versions": attributes['replace-versions']
             }
