@@ -1,6 +1,7 @@
 # Changelog
 
 ## Unreleased
+- Update to Python v3.13
 
 ## 0.2.0 (2025-03-17)
 - fix: duplicate container creation
