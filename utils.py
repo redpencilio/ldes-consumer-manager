@@ -1,35 +1,42 @@
+import re
 from helpers import generate_uuid, logger
-from config import CONSUMER_IMAGE, MU_NETWORK, CONTAINER_LABEL, COMPOSE_PROJECT
+from config import CONSUMER_IMAGE, MU_NETWORK, CONTAINER_LABEL, COMPOSE_PROJECT, CONSUMER_STATE_DIR
 import docker
 
 def create_container(endpoint, dataset_graph, options):
-  environment_options = options if options else {}
-  client = docker.from_env()
-  environment_options["LDES_ENDPOINT_VIEW"] = endpoint
-  dataset_uuid = generate_uuid()
-  environment_options["MU_APPLICATION_GRAPH"] = dataset_graph if dataset_graph else f"http://datasets.vocabsearch.local/{dataset_uuid}"
-  environment_options["LDES_STREAM"] = dataset_graph if dataset_graph else f"http://datasets.vocabsearch.local/{dataset_uuid}"
-  environment_options["LOG_LEVEL"] = "debug"
-  environment_options["INGEST_MODE"] = "MATERIALIZE"
-  environment_options["SPARQL_BATCH_SIZE"] = "150"
-  container_labels = [CONTAINER_LABEL]
+    environment_options = options if options else {}
+    client = docker.from_env()
+    environment_options["LDES_ENDPOINT_VIEW"] = endpoint
+    dataset_uuid = generate_uuid()
+    environment_options["MU_APPLICATION_GRAPH"] = dataset_graph if dataset_graph else f"http://datasets.vocabsearch.local/{dataset_uuid}"
+    environment_options["LDES_STREAM"] = dataset_graph if dataset_graph else f"http://datasets.vocabsearch.local/{dataset_uuid}"
+    environment_options["LOG_LEVEL"] = "debug"
+    environment_options["INGEST_MODE"] = "MATERIALIZE"
+    environment_options["SPARQL_BATCH_SIZE"] = "150"
+    container_labels = [CONTAINER_LABEL]
+    escaped_endpoint = re.sub(r"[/:#]", "_", endpoint)
+    escaped_dataset = re.sub(r"[/:#]", "_", options["DATASET_URL"]) if options["DATASET_URL"] else None
+    # To store the state in a volume, we need to have a way to handle the same endpoint being used
+    # for more than one dataset, so we include the url in the path
+    state_volume = [f"{CONSUMER_STATE_DIR}/{escaped_dataset}/{escaped_endpoint}:/data"] if CONSUMER_STATE_DIR and escaped_dataset else None
 
-  # Make consumers show up in same overview for docker-compose ps
-  if COMPOSE_PROJECT:
-    container_labels = {
-      CONTAINER_LABEL: None,
-      "com.docker.compose.project": COMPOSE_PROJECT
-    }
+    # Make consumers show up in same overview for docker-compose ps
+    if COMPOSE_PROJECT:
+      container_labels = {
+        CONTAINER_LABEL: None,
+        "com.docker.compose.project": COMPOSE_PROJECT
+      }
 
-  container = client.containers.run(
-      CONSUMER_IMAGE,
-      detach=True,
-      environment=environment_options,
-      network=MU_NETWORK,
-      restart_policy = {"Name": "always" },
-      labels=container_labels
-  )
-  return container_to_json_view(container)
+    container = client.containers.run(
+        CONSUMER_IMAGE,
+        detach=True,
+        environment=environment_options,
+        network=MU_NETWORK,
+        restart_policy = {"Name": "always" },
+        labels=container_labels,
+        volumes=state_volume
+    )
+    return container_to_json_view(container)
 
 
 def container_to_json_view(container):

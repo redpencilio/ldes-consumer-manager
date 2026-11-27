@@ -139,7 +139,7 @@ def create_consumer_container(feed_url, dataset_graph=None, requests_per_minute=
     options = {
         "LDES_REQUESTS_PER_MINUTE": requests_per_minute,
         "CRON_PATTERN": CRON_PATTERN,
-        "REPLACE_VERSIONS": replace_versions,
+        "REPLACE_VERSIONS": str(replace_versions).lower(),
         "SUDO_QUERY_RETRY": "true"
     }
     existing_containers = []

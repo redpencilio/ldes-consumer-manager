@@ -2,6 +2,7 @@
 
 ## Unreleased
 - Update to Python v3.13
+- Add support for storing consumer state in a volume instead of in the container filesystem
 
 ## 0.2.0 (2025-03-17)
 - fix: duplicate container creation

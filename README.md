@@ -64,3 +64,4 @@ This service can be configured to create consumers when LDES datasets get create
 - `MU_NETWORK`: the network in which the created consumers should reside
 - `COMPOSE_PROJECT`: (optional) The compose project label to attach to the consumer containers, so they show up in `docker-compose ps` overview of the project.
 - `REMOVE_CONTAINERS_ON_DELETE`: whether to remove (besides stopping) the associated container when a dataset is deleted (default: `False`)
+- `CONSUMER_STATE_DIR`: (optional) The full (not relative) path of where to store current state information for created consumers. Allows syncing to recover if a container is destroyed.
