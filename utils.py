@@ -13,6 +13,7 @@ def create_container(endpoint, dataset_graph, options):
     environment_options["LOG_LEVEL"] = "debug"
     environment_options["INGEST_MODE"] = "MATERIALIZE"
     environment_options["SPARQL_BATCH_SIZE"] = "150"
+    environment_options["ALLOW_MU_AUTH_SUDO"] = "true"
     container_labels = [CONTAINER_LABEL]
     escaped_endpoint = re.sub(r"[/:#]", "_", endpoint)
     escaped_dataset = re.sub(r"[/:#]", "_", options["DATASET_URL"]) if options["DATASET_URL"] else None
